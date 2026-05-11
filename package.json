@@ -1,0 +1,34 @@
+{
+  "name": "natalia_legion_qaaut",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:chromium": "playwright test --project=chromium",
+    "test:firefox": "playwright test --project=firefox",
+    "test:webkit": "playwright test --project=webkit",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen",
+    "install:browsers": "playwright install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/klimmur/natalia_legion_QAaut.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/klimmur/natalia_legion_QAaut/issues"
+  },
+  "homepage": "https://github.com/klimmur/natalia_legion_QAaut#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.7.0"
+  }
+}
