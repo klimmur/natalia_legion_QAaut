@@ -60,6 +60,52 @@ export async function openNewProgramModal(page: Page): Promise<Locator> {
 }
 
 /**
+ * Locate the trash (🗑) delete icon for the program row matching `name`.
+ */
+export function deleteButtonForRow(page: Page, name: string): Locator {
+  return rowByName(page, name).getByRole('button', { name: '🗑' });
+}
+
+export type DialogAction = 'accept' | 'dismiss';
+
+/**
+ * Register a one-shot handler for the native confirm() dialog that the app
+ * uses for delete confirmation. Returns a Promise that resolves to the
+ * dialog message once the dialog has been handled.
+ *
+ * Usage:
+ *   const dialogP = expectDeleteConfirmDialog(page, 'accept');
+ *   await deleteButtonForRow(page, name).click();
+ *   const message = await dialogP;
+ *   expect(message).toContain(name);
+ */
+export function expectDeleteConfirmDialog(
+  page: Page,
+  action: DialogAction,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error('Native confirm dialog did not appear within 10s')),
+      10_000,
+    );
+    page.once('dialog', async (dialog) => {
+      clearTimeout(timer);
+      const message = dialog.message();
+      try {
+        if (action === 'accept') {
+          await dialog.accept();
+        } else {
+          await dialog.dismiss();
+        }
+        resolve(message);
+      } catch (err) {
+        reject(err);
+      }
+    });
+  });
+}
+
+/**
  * Locate a Programs-table row whose name cell contains exactly `name`.
  * Uses a descendant exact-text match (`getByText(name, { exact: true })`) so
  * "Foo" does NOT match a row named "Foo - Updated".
