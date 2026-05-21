@@ -19,6 +19,11 @@ export async function login(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Dashboard', level: 2 })).toBeVisible();
 }
 
+export async function signOut(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL(/\/login$/);
+}
+
 export async function gotoPrograms(page: Page): Promise<void> {
   await page.getByRole('button', { name: '🎓 Programs' }).click();
   await expect(page).toHaveURL(/\/programs$/);
