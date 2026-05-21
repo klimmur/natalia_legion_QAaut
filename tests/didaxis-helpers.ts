@@ -49,6 +49,17 @@ export async function createProgram(
 }
 
 /**
+ * Open the New Program modal and return its dialog locator. The dialog is
+ * asserted visible before returning.
+ */
+export async function openNewProgramModal(page: Page): Promise<Locator> {
+  await page.getByRole('button', { name: '+ New Program' }).click();
+  const dialog = page.getByRole('dialog', { name: 'New Program' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+}
+
+/**
  * Locate a Programs-table row whose name cell contains exactly `name`.
  * Uses a descendant exact-text match (`getByText(name, { exact: true })`) so
  * "Foo" does NOT match a row named "Foo - Updated".
