@@ -1,10 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   gotoPrograms,
   login,
   openNewProgramModal,
   rowByName,
+  submitNewProgram,
   uniqueName,
 } from './didaxis-helpers';
 
@@ -44,10 +45,7 @@ test.describe('DS-3: Create Program — positive flows', () => {
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
     await dialog.getByRole('textbox', { name: 'Description' }).fill(description);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
 
     // The `&` must be rendered as itself, not HTML-escaped.
     const row = rowByName(page, name);
@@ -60,10 +58,7 @@ test.describe('DS-3: Create Program — positive flows', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-003: Leading/trailing whitespace in Name is trimmed on save', async ({ page }) => {
@@ -72,10 +67,7 @@ test.describe('DS-3: Create Program — positive flows', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(padded);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    // The row appears under the TRIMMED name.
-    await expect(rowByName(page, trimmedName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, trimmedName);
   });
 
   test('TC-004: Case variants are accepted as distinct (app is case-sensitive — documented gap)', async ({
@@ -90,14 +82,11 @@ test.describe('DS-3: Create Program — positive flows', () => {
 
     let dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(base);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-    await expect(rowByName(page, base)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, base);
 
     dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(upper);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, upper)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, upper);
     await expect(rowByName(page, base)).toBeVisible();
   });
 
@@ -108,9 +97,8 @@ test.describe('DS-3: Create Program — positive flows', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog, name);
 
     // Row exists with the EXACT name (no collapsing).
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
   });
 });

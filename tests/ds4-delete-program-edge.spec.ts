@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
@@ -8,6 +8,7 @@ import {
   login,
   openNewProgramModal,
   rowByName,
+  submitNewProgram,
   uniqueName,
 } from './didaxis-helpers';
 
@@ -142,10 +143,7 @@ test.describe('DS-4: Delete Program — edge cases', () => {
     // Re-create with the same exact name.
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-209: Concurrent delete attempts — one DELETE succeeds, the other gets 4xx', async ({

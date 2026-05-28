@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
@@ -11,7 +11,7 @@ import {
 
 /**
  * DS-2 — Edit existing program — negative flows.
- * Source test plan: block2/DS-2/agent_output.md (TC-101…TC-111)
+ * Source test plan: block2/DS-2/DS-2_test_plan.md (TC-101…TC-111)
  */
 
 test.describe('DS-2: Edit existing program — negative flows', () => {
@@ -79,20 +79,20 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
     ).toHaveCount(2, { timeout: SLOW_LIST_TIMEOUT });
   });
 
-  test('TC-104: Very long Name (1000 chars) — currently accepted (no enforced max documented)', async ({
+  test('TC-104: Name exceeding maximum length (101 chars) — documented gap if accepted', async ({
     page,
   }) => {
-    const longName = `${programName}-${'x'.repeat(1000)}`;
+    // Confluence Field Definitions: Name max 100 characters. Test plan: N+1 should be rejected.
+    const overMaxName = 'x'.repeat(101);
 
     const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(longName);
+    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(overMaxName);
     await dialog.getByRole('button', { name: 'Save' }).click();
 
-    // The test plan expects either truncation-at-entry or rejection-with-message.
-    // The current app accepts the full string. We assert the row is created so
-    // any future max-length enforcement breaks this test loudly.
-    await expect(rowByName(page, longName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(dialog).toBeHidden();
+    // Test plan expects validation error or blocked save. Current app may accept the value —
+    // assert actual behavior so future max-length enforcement breaks this test loudly.
+    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await expect(rowByName(page, overMaxName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
   });
 
   test.skip(
@@ -149,9 +149,12 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
 
     await page.waitForTimeout(2000);
 
-    // Either an error is surfaced or the modal stays open. We assert the
-    // milder, more robust contract: no stale optimistic update is left behind.
+    // Modal stays open and the list must not show a stale optimistic update.
     await expect(dialog).toBeVisible();
+    const row = rowByName(page, programName);
+    await expect(row).toBeVisible();
+    await expect(row).toContainText(originalDescription);
+    await expect(row).not.toContainText(updatedDescription);
 
     await context.setOffline(false);
     await dialog.getByRole('button', { name: 'Cancel' }).click();

@@ -1,7 +1,9 @@
-import { expect, type Page, type Locator } from '@playwright/test';
+import { expect, type Page, type Locator, type Response } from '@playwright/test';
+import { trackProgram } from '../fixtures/cleanup.fixture';
 
 const EMAIL = process.env.DIDAXIS_EMAIL!;
 const PASSWORD = process.env.DIDAXIS_PASSWORD!;
+const PROGRAMS_POST = /\/api\/programs\/?$/;
 
 if (!EMAIL || !PASSWORD) {
   throw new Error(
@@ -10,6 +12,66 @@ if (!EMAIL || !PASSWORD) {
 }
 
 export const SLOW_LIST_TIMEOUT = 15_000;
+
+function isProgramCreateResponse(response: Response): boolean {
+  const request = response.request();
+  if (request.method() !== 'POST' || response.status() !== 201) {
+    return false;
+  }
+
+  try {
+    return PROGRAMS_POST.test(new URL(response.url()).pathname);
+  } catch {
+    return false;
+  }
+}
+
+async function extractProgramId(response: Response): Promise<string | null> {
+  try {
+    const body = await response.json();
+    const id = body?.data?.id;
+    return typeof id === 'string' && id.length > 0 ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Click a Create control, capture POST /api/programs → 201, and track the UUID.
+ */
+export async function trackCreateOnClick(
+  page: Page,
+  click: () => Promise<void>,
+): Promise<string> {
+  const responsePromise = page.waitForResponse(isProgramCreateResponse);
+  await click();
+  const response = await responsePromise;
+  const id = await extractProgramId(response);
+  if (!id) {
+    throw new Error('POST /api/programs did not return a program id');
+  }
+  trackProgram(id);
+  return id;
+}
+
+/**
+ * Submit the New Program dialog, track the created program, and wait for the list to update.
+ */
+export async function submitNewProgram(
+  page: Page,
+  dialog: Locator,
+  rowName?: string,
+): Promise<string> {
+  const id = await trackCreateOnClick(page, () =>
+    dialog.getByRole('button', { name: 'Create' }).click(),
+  );
+
+  if (rowName !== undefined) {
+    await expect(rowByName(page, rowName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+  }
+  await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+  return id;
+}
 
 export async function login(page: Page): Promise<void> {
   await page.goto('/login');
@@ -34,7 +96,7 @@ export async function createProgram(
   page: Page,
   name: string,
   description: string,
-): Promise<void> {
+): Promise<string> {
   await page.getByRole('button', { name: '+ New Program' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'New Program' });
@@ -45,12 +107,7 @@ export async function createProgram(
 
   const createBtn = dialog.getByRole('button', { name: 'Create' });
   await expect(createBtn).toBeEnabled();
-  await createBtn.click();
-
-  await expect(
-    rowByName(page, name),
-  ).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-  await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+  return submitNewProgram(page, dialog, name);
 }
 
 /**

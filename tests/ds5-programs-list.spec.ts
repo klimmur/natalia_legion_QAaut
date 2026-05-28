@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,

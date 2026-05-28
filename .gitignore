@@ -5,6 +5,7 @@ yarn-debug.log*
 yarn-error.log*
 
 # Playwright
+.test-artifacts/
 /test-results/
 /playwright-report/
 /blob-report/

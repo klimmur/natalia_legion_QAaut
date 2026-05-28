@@ -1,4 +1,5 @@
-import { test, expect, type APIResponse } from '@playwright/test';
+import { type APIResponse } from '@playwright/test';
+import { test, expect, trackProgram } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
@@ -6,6 +7,8 @@ import {
   login,
   openNewProgramModal,
   rowByName,
+  submitNewProgram,
+  trackCreateOnClick,
   uniqueName,
 } from './didaxis-helpers';
 
@@ -65,7 +68,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
     // Try to create a SECOND program with the same name.
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog, name);
 
     await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
 
@@ -88,7 +91,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
     // The current app accepts it.
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(lower);
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog, lower);
 
     await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
     await expect(rowByName(page, lower)).toBeVisible();
@@ -107,7 +110,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
     // then silently creates a duplicate.
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(`   ${name}   `);
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog, name);
 
     await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
     await expect(rowByName(page, name)).toHaveCount(2, { timeout: SLOW_LIST_TIMEOUT });
@@ -122,9 +125,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-107: Server rejects empty / whitespace-only names; accepts duplicate (documented gap)', async ({
@@ -151,6 +152,13 @@ test.describe('DS-3: Create Program — negative flows', () => {
     // Test plan expects 400/422 on duplicate; the current server accepts it
     // (responds 200/201). Document the gap with a fail-soft assertion.
     expect.soft(duplicateResp.status(), 'duplicate POST should be rejected').toBeGreaterThanOrEqual(400);
+    if (duplicateResp.status() === 201) {
+      const body = await duplicateResp.json();
+      const id = body?.data?.id;
+      if (typeof id === 'string' && id.length > 0) {
+        trackProgram(id);
+      }
+    }
   });
 
   test('TC-108: Double-click Create issues exactly one POST and creates one program', async ({
@@ -169,7 +177,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
 
     const createBtn = dialog.getByRole('button', { name: 'Create' });
-    await createBtn.click({ clickCount: 2, delay: 30 });
+    await trackCreateOnClick(page, () => createBtn.click({ clickCount: 2, delay: 30 }));
 
     await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
     await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
@@ -200,7 +208,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
     await nameField.fill(name);
     await descriptionField.fill('Carefully written description');
 
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog, name);
 
     // No error appears, modal closes; Description is irrelevant because
     // the duplicate was accepted. Soft-document the gap.
@@ -228,7 +236,7 @@ test.describe('DS-3: Create Program — negative flows', () => {
 
     // Retry online: the same Create click should now succeed exactly once.
     await context.setOffline(false);
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await trackCreateOnClick(page, () => dialog.getByRole('button', { name: 'Create' }).click());
 
     await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
     await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });

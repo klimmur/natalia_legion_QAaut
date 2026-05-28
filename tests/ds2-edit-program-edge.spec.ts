@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
@@ -12,7 +12,7 @@ import {
 
 /**
  * DS-2 — Edit existing program — edge cases.
- * Source test plan: block2/DS-2/agent_output.md (TC-201…TC-214)
+ * Source test plan: block2/DS-2/DS-2_test_plan.md (TC-201…TC-214)
  */
 
 test.describe('DS-2: Edit existing program — edge cases', () => {
@@ -41,17 +41,17 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
     await expect(dialog.getByRole('textbox', { name: 'Program Name' })).toHaveValue(trimmedName);
   });
 
-  test('TC-202: A long Name (200 chars) saves successfully', async ({ page }) => {
-    // Test plan calls for "exactly N max chars". No max is documented and the
-    // app currently accepts at least 1000 chars (see TC-104). 200 is a safe
-    // representative "long but reasonable" value.
-    const longName = `${programName.slice(0, 30)}-${'A'.repeat(170)}`;
+  test('TC-202: Name at exactly the max length (100 chars) saves successfully', async ({
+    page,
+  }) => {
+    // Confluence Field Definitions: Name max 100 characters.
+    const exactMaxName = 'A'.repeat(100);
 
     const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(longName);
-    await saveAndClose(page, dialog, longName);
+    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(exactMaxName);
+    await saveAndClose(page, dialog, exactMaxName);
 
-    await expect(rowByName(page, longName)).toBeVisible();
+    await expect(rowByName(page, exactMaxName)).toBeVisible();
   });
 
   test('TC-203: Name with special characters and punctuation is accepted', async ({ page }) => {
@@ -115,18 +115,18 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
     await expect(rowByName(page, sqlName)).toBeVisible();
   });
 
-  test('TC-207: A very large Description is accepted and round-trips', async ({ page }) => {
-    // App trims trailing whitespace on save (verified via TC-201), so the
-    // stored value must not end with whitespace for this exact round-trip
-    // assertion to hold.
-    const bigDescription = `${'Long description sentence. '.repeat(200)}END`; // ~5.4 KB
+  test('TC-207: Description at documented maximum length (500 chars) round-trips', async ({
+    page,
+  }) => {
+    // Confluence Field Definitions: Description max 500 characters.
+    const maxDescription = 'D'.repeat(500);
 
     let dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Description' }).fill(bigDescription);
+    await dialog.getByRole('textbox', { name: 'Description' }).fill(maxDescription);
     await saveAndClose(page, dialog, programName);
 
     dialog = await openEditModal(page, programName);
-    await expect(dialog.getByRole('textbox', { name: 'Description' })).toHaveValue(bigDescription);
+    await expect(dialog.getByRole('textbox', { name: 'Description' })).toHaveValue(maxDescription);
   });
 
   test('TC-208: Saving with no changes closes the modal and keeps the row unchanged', async ({
@@ -211,12 +211,19 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
     await expect(page.getByRole('dialog', { name: 'Edit Program' })).toHaveCount(0);
   });
 
-  test('TC-214: Edit modal is keyboard-accessible (Tab focuses fields; Esc closes)', async ({
-    page,
-  }) => {
-    const dialog = await openEditModal(page, programName);
+  test('TC-214: Edit modal is keyboard-accessible', async ({ page }) => {
+    const row = rowByName(page, programName);
+    const editBtn = row.getByRole('button', { name: '✏️' });
+
+    await editBtn.focus();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.getByRole('dialog', { name: 'Edit Program' });
+    await expect(dialog).toBeVisible();
+
     const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
     const descriptionField = dialog.getByRole('textbox', { name: 'Description' });
+    const saveBtn = dialog.getByRole('button', { name: 'Save' });
 
     await nameField.focus();
     await expect(nameField).toBeFocused();
@@ -224,8 +231,16 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
     await page.keyboard.press('Tab');
     await expect(descriptionField).toBeFocused();
 
-    // Esc closes the modal (no warning — same as TC-111).
+    const keyboardEditedName = `${programName} - KB`;
+    await nameField.fill(keyboardEditedName);
+    await saveBtn.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(rowByName(page, keyboardEditedName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+
+    const escDialog = await openEditModal(page, keyboardEditedName);
     await page.keyboard.press('Escape');
-    await expect(dialog).toBeHidden();
+    await expect(escDialog).toBeHidden();
   });
 });

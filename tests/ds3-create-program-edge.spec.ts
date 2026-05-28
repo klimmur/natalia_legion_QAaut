@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
@@ -6,6 +6,7 @@ import {
   login,
   openNewProgramModal,
   rowByName,
+  submitNewProgram,
   uniqueName,
 } from './didaxis-helpers';
 
@@ -31,9 +32,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-202: Minimum-length Name (1 character) is accepted', async ({ page }) => {
@@ -41,9 +40,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-203: Single special character "&" name behaves predictably (accepted in current app)', async ({
@@ -53,9 +50,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
     await expect(rowByName(page, name)).toContainText('&');
   });
 
@@ -66,9 +61,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-205: RTL Arabic name is accepted', async ({ page }) => {
@@ -76,9 +69,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
   });
 
   test('TC-206: Zero-width / invisible-only Name is rejected like empty (documented gap)', async ({
@@ -110,9 +101,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
     await page.waitForTimeout(500);
     expect(alertFired).toBe(false);
   });
@@ -122,9 +111,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, name)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
 
     // Programs table is still rendered (would be empty if SQL had executed).
     await expect(page.getByRole('table')).toBeVisible();
@@ -146,7 +133,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
     const value = await nameField.inputValue();
     expect(value).not.toMatch(/\n/);
 
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog);
 
     // Find the resulting row by the unique baseName substring rather than the
     // exact noisy string (since normalization differs across browsers).
@@ -167,9 +154,7 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(confusable);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-
-    await expect(rowByName(page, confusable)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, confusable);
     // Both should coexist — the current app does not normalize confusables.
     await expect(rowByName(page, latin)).toBeVisible();
   });
@@ -202,8 +187,8 @@ test.describe('DS-3: Create Program — edge cases', () => {
       ]);
 
       await Promise.all([
-        dialogA.getByRole('button', { name: 'Create' }).click(),
-        dialogB.getByRole('button', { name: 'Create' }).click(),
+        submitNewProgram(pageA, dialogA, name),
+        submitNewProgram(pageB, dialogB, name),
       ]);
 
       // Refresh both lists, then count rows on either side. Both should see
@@ -227,11 +212,9 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(`${name} `); // single trailing space
-    await dialog.getByRole('button', { name: 'Create' }).click();
+    await submitNewProgram(page, dialog, name);
 
     // Test plan: trimmed → duplicate → error.
-    // Actual app: trimmed → duplicate accepted.
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
     await expect(rowByName(page, name)).toHaveCount(2, { timeout: SLOW_LIST_TIMEOUT });
   });
 

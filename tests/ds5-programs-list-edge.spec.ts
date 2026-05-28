@@ -1,4 +1,5 @@
-import { test, expect, type Browser } from '@playwright/test';
+import { type Browser } from '@playwright/test';
+import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
@@ -10,6 +11,7 @@ import {
   openNewProgramModal,
   rowByName,
   saveAndClose,
+  submitNewProgram,
   uniqueName,
 } from './didaxis-helpers';
 
@@ -81,8 +83,7 @@ test.describe('DS-5: Programs list — edge cases', () => {
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
     await dialog.getByRole('textbox', { name: 'Description' }).fill('');
-    await dialog.getByRole('button', { name: 'Create' }).click();
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
 
     const row = rowByName(page, name);
     await expect(row).toBeVisible();
@@ -123,8 +124,7 @@ test.describe('DS-5: Programs list — edge cases', () => {
     const dialog = await openNewProgramModal(page);
     await dialog.getByRole('textbox', { name: 'Program Name' }).fill(name);
     await dialog.getByRole('textbox', { name: 'Description' }).fill(desc);
-    await dialog.getByRole('button', { name: 'Create' }).click();
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await submitNewProgram(page, dialog, name);
 
     const row = rowByName(page, name);
     await expect(row).toBeVisible();
