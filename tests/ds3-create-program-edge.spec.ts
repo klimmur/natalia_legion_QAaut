@@ -1,9 +1,9 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
+import { AUTH_STORAGE_PATH } from './auth.constants';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   gotoPrograms,
-  login,
   openNewProgramModal,
   rowByName,
   submitNewProgram,
@@ -19,7 +19,6 @@ test.describe('DS-3: Create Program — edge cases', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
   });
 
@@ -169,13 +168,12 @@ test.describe('DS-3: Create Program — edge cases', () => {
 
     const name = uniqueName('Concurrent');
 
-    const ctxA = await browser.newContext();
-    const ctxB = await browser.newContext();
+    const ctxA = await browser.newContext({ storageState: AUTH_STORAGE_PATH });
+    const ctxB = await browser.newContext({ storageState: AUTH_STORAGE_PATH });
     const pageA = await ctxA.newPage();
     const pageB = await ctxB.newPage();
 
     try {
-      await Promise.all([login(pageA), login(pageB)]);
       await Promise.all([gotoPrograms(pageA), gotoPrograms(pageB)]);
 
       const dialogA = await openNewProgramModal(pageA);

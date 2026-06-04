@@ -2,7 +2,6 @@ import { test, expect } from '../fixtures/cleanup.fixture';
 import {
   SLOW_LIST_TIMEOUT,
   gotoPrograms,
-  login,
   openNewProgramModal,
   rowByName,
   submitNewProgram,
@@ -32,7 +31,6 @@ test.describe('DS-3: Create Program — positive flows', () => {
   test.describe.configure({ timeout: 90_000 });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
   });
 

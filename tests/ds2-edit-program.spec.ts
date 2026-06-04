@@ -3,7 +3,6 @@ import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   gotoPrograms,
-  login,
   openEditModal,
   rowByName,
   saveAndClose,
@@ -15,6 +14,8 @@ import {
  *
  * Source test plan: block2/DS-2/DS-2_test_plan.md
  * Locator rules: didaxis_prompt_template.md
+ * Auth: reused admin session (tests/auth.setup.ts → playwright.config storageState).
+ *        Tests call gotoPrograms() only — no per-test UI login.
  *
  * Notes about the live app behavior (verified via Playwright MCP exploration):
  *   - The Edit modal contains only Program Name + Description (plus an optional
@@ -39,7 +40,6 @@ test.describe('DS-2: Edit existing program — positive flows', () => {
 
   test.beforeEach(async ({ page }) => {
     programName = uniqueName();
-    await login(page);
     await gotoPrograms(page);
     await createProgram(page, programName, originalDescription);
   });

@@ -3,7 +3,6 @@ import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   gotoPrograms,
-  login,
   openEditModal,
   rowByName,
   saveAndClose,
@@ -13,6 +12,8 @@ import {
 /**
  * DS-2 — Edit existing program — edge cases.
  * Source test plan: block2/DS-2/DS-2_test_plan.md (TC-201…TC-214)
+ * Auth: reused admin session (tests/auth.setup.ts → playwright.config storageState).
+ *        Tests call gotoPrograms() only — no per-test UI login.
  */
 
 test.describe('DS-2: Edit existing program — edge cases', () => {
@@ -23,7 +24,6 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
 
   test.beforeEach(async ({ page }) => {
     programName = uniqueName();
-    await login(page);
     await gotoPrograms(page);
     await createProgram(page, programName, originalDescription);
   });

@@ -1,12 +1,12 @@
 import { type Browser } from '@playwright/test';
 import { test, expect } from '../fixtures/cleanup.fixture';
+import { AUTH_STORAGE_PATH } from './auth.constants';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   deleteButtonForRow,
   expectDeleteConfirmDialog,
   gotoPrograms,
-  login,
   openEditModal,
   openNewProgramModal,
   rowByName,
@@ -24,7 +24,6 @@ test.describe('DS-5: Programs list — edge cases', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
   });
 
@@ -268,10 +267,9 @@ test.describe('DS-5: Programs list — edge cases', () => {
     const initialName = uniqueName('Multi-Session');
 
     // Tab B: separate context = separate auth session.
-    const ctxB = await browser.newContext();
+    const ctxB = await browser.newContext({ storageState: AUTH_STORAGE_PATH });
     try {
       const pageB = await ctxB.newPage();
-      await login(pageB);
       await gotoPrograms(pageB);
       await createProgram(pageB, initialName, 'created in tab B');
 

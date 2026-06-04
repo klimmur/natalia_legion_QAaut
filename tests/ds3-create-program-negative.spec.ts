@@ -4,7 +4,6 @@ import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   gotoPrograms,
-  login,
   openNewProgramModal,
   rowByName,
   submitNewProgram,
@@ -21,7 +20,6 @@ test.describe('DS-3: Create Program — negative flows', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
   });
 

@@ -86,7 +86,18 @@ export async function signOut(page: Page): Promise<void> {
   await expect(page).toHaveURL(/\/login$/);
 }
 
+/** Land on Dashboard — UI login when benchmarking, else reuse storageState cookies. */
+export async function goToDashboard(page: Page): Promise<void> {
+  if (process.env.PER_TEST_LOGIN === '1') {
+    await login(page);
+    return;
+  }
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: 'Dashboard', level: 2 })).toBeVisible();
+}
+
 export async function gotoPrograms(page: Page): Promise<void> {
+  await goToDashboard(page);
   await page.getByRole('button', { name: '🎓 Programs' }).click();
   await expect(page).toHaveURL(/\/programs$/);
   await expect(page.getByRole('heading', { name: 'Programs', level: 2 })).toBeVisible();

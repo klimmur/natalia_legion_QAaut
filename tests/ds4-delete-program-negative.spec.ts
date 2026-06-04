@@ -1,11 +1,11 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
+import { AUTH_STORAGE_PATH } from './auth.constants';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   deleteButtonForRow,
   expectDeleteConfirmDialog,
   gotoPrograms,
-  login,
   rowByName,
   uniqueName,
 } from './didaxis-helpers';
@@ -22,7 +22,6 @@ test.describe('DS-4: Delete Program — negative flows', () => {
 
   test.beforeEach(async ({ page }) => {
     programName = uniqueName('Test Program');
-    await login(page);
     await gotoPrograms(page);
     await createProgram(page, programName, 'Original');
   });
@@ -93,10 +92,9 @@ test.describe('DS-4: Delete Program — negative flows', () => {
     browser,
   }) => {
     // Simulate "another session" by deleting it from a fresh browser context.
-    const ctxB = await browser.newContext();
+    const ctxB = await browser.newContext({ storageState: AUTH_STORAGE_PATH });
     const pageB = await ctxB.newPage();
     try {
-      await login(pageB);
       await gotoPrograms(pageB);
 
       const dialogB = expectDeleteConfirmDialog(pageB, 'accept');

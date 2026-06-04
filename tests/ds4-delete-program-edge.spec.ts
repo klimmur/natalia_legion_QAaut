@@ -1,11 +1,11 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
+import { AUTH_STORAGE_PATH } from './auth.constants';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   deleteButtonForRow,
   expectDeleteConfirmDialog,
   gotoPrograms,
-  login,
   openNewProgramModal,
   rowByName,
   submitNewProgram,
@@ -26,7 +26,6 @@ test.describe('DS-4: Delete Program — edge cases', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
   });
 
@@ -154,10 +153,9 @@ test.describe('DS-4: Delete Program — edge cases', () => {
     await createProgram(page, name, 'Original');
 
     // Open a SECOND context as the same admin.
-    const ctxB = await browser.newContext();
+    const ctxB = await browser.newContext({ storageState: AUTH_STORAGE_PATH });
     const pageB = await ctxB.newPage();
     try {
-      await login(pageB);
       await gotoPrograms(pageB);
 
       // Trigger DELETE from BOTH contexts as close together as possible.

@@ -5,7 +5,6 @@ import {
   deleteButtonForRow,
   expectDeleteConfirmDialog,
   gotoPrograms,
-  login,
   rowByName,
   uniqueName,
 } from './didaxis-helpers';
@@ -37,7 +36,6 @@ test.describe('DS-4: Delete Program — positive flows', () => {
 
   test.beforeEach(async ({ page }) => {
     programName = uniqueName('Test Program');
-    await login(page);
     await gotoPrograms(page);
     await createProgram(page, programName, 'Original');
   });

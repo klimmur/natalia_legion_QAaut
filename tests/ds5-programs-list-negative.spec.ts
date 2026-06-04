@@ -1,12 +1,13 @@
 import { request as playwrightRequest } from '@playwright/test';
 import { test, expect } from '../fixtures/cleanup.fixture';
+import { EMPTY_STORAGE_STATE } from './auth.constants';
 import {
   SLOW_LIST_TIMEOUT,
   createProgram,
   deleteButtonForRow,
   expectDeleteConfirmDialog,
+  goToDashboard,
   gotoPrograms,
-  login,
   rowByName,
   uniqueName,
 } from './didaxis-helpers';
@@ -43,7 +44,7 @@ test.describe('DS-5: Programs list — negative flows', () => {
   });
 
   test('TC-103: 500 on list fetch shows an error state, not the empty state', async ({ page }) => {
-    await login(page);
+    await goToDashboard(page);
 
     // Force the next list fetch to fail.
     await page.route('**/api/programs', async (route) => {
@@ -87,7 +88,7 @@ test.describe('DS-5: Programs list — negative flows', () => {
     page,
     context,
   }) => {
-    await login(page);
+    await goToDashboard(page);
 
     await context.setOffline(true);
     try {
@@ -118,7 +119,7 @@ test.describe('DS-5: Programs list — negative flows', () => {
   test('TC-105: Slow list response shows a loading state, not the empty state', async ({
     page,
   }) => {
-    await login(page);
+    await goToDashboard(page);
 
     const DELAY_MS = 4_000;
 
@@ -156,7 +157,6 @@ test.describe('DS-5: Programs list — negative flows', () => {
   );
 
   test('TC-107: A deleted program does not appear in the list', async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
 
     const name = uniqueName('Test Program');
@@ -177,7 +177,6 @@ test.describe('DS-5: Programs list — negative flows', () => {
   test('TC-108: XSS payloads in Name and Description render as text and do not execute', async ({
     page,
   }) => {
-    await login(page);
     await gotoPrograms(page);
 
     const xssName = uniqueName(`<script>window.__xss=1</script>X`);
@@ -225,7 +224,7 @@ test.describe('DS-5: Programs list — negative flows', () => {
     // ──────────────────────────────────────────────────────────────────────
     test.fail();
 
-    await login(page);
+    await goToDashboard(page);
 
     await page.route('**/api/programs', async (route) => {
       if (route.request().method() !== 'GET') {
@@ -265,15 +264,19 @@ test.describe('DS-5: Programs list — negative flows', () => {
     await page.unroute('**/api/programs');
   });
 
-  test('TC-110: Deep-link to /programs while logged out redirects to /login', async ({
-    page,
-  }) => {
-    await page.goto('/programs');
+  test.describe('unauthenticated', () => {
+    test.use({ storageState: EMPTY_STORAGE_STATE });
 
-    // App should bounce the unauthenticated user to /login (or at minimum,
-    // never expose the Programs heading + table to a logged-out request).
-    await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+    test('TC-110: Deep-link to /programs while logged out redirects to /login', async ({
+      page,
+    }) => {
+      await page.goto('/programs');
+
+      // App should bounce the unauthenticated user to /login (or at minimum,
+      // never expose the Programs heading + table to a logged-out request).
+      await expect(page).toHaveURL(/\/login$/, { timeout: 10_000 });
+      await expect(page.getByRole('button', { name: 'Sign In' })).toBeVisible();
+    });
   });
 
   test.skip(

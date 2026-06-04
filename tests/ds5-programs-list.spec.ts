@@ -33,7 +33,6 @@ test.describe('DS-5: Programs list — positive flows', () => {
   test.describe.configure({ timeout: 120_000 });
 
   test.beforeEach(async ({ page }) => {
-    await login(page);
     await gotoPrograms(page);
   });
 

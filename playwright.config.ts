@@ -1,12 +1,16 @@
 import { defineConfig, devices } from '@playwright/test';
 import dotenv from 'dotenv';
 import path from 'path';
+import { AUTH_STORAGE_RELATIVE } from './tests/auth.constants';
 
 /**
  * Read environment variables from file.
  * https://github.com/motdotla/dotenv
  */
 dotenv.config({ path: path.resolve(__dirname, '.env') });
+
+/** Set PER_TEST_LOGIN=1 to benchmark UI login per test (no storageState / setup project). */
+const reuseAuth = process.env.PER_TEST_LOGIN !== '1';
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -36,19 +40,33 @@ export default defineConfig({
 
   /* Configure projects for major browsers */
   projects: [
+    ...(reuseAuth ? [{ name: 'setup', testMatch: /auth\.setup\.ts/ }] : []),
+
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(reuseAuth ? { storageState: AUTH_STORAGE_RELATIVE } : {}),
+      },
+      ...(reuseAuth ? { dependencies: ['setup' as const] } : {}),
     },
 
     {
       name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
+      use: {
+        ...devices['Desktop Firefox'],
+        ...(reuseAuth ? { storageState: AUTH_STORAGE_RELATIVE } : {}),
+      },
+      ...(reuseAuth ? { dependencies: ['setup' as const] } : {}),
     },
 
     {
       name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
+      use: {
+        ...devices['Desktop Safari'],
+        ...(reuseAuth ? { storageState: AUTH_STORAGE_RELATIVE } : {}),
+      },
+      ...(reuseAuth ? { dependencies: ['setup' as const] } : {}),
     },
 
     /* Test against mobile viewports. */
