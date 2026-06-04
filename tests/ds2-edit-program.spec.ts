@@ -1,13 +1,6 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
-import {
-  SLOW_LIST_TIMEOUT,
-  createProgram,
-  gotoPrograms,
-  openEditModal,
-  rowByName,
-  saveAndClose,
-  uniqueName,
-} from './didaxis-helpers';
+import { SLOW_LIST_TIMEOUT, uniqueName } from './didaxis-helpers';
+import { ProgramsPage } from './pages/didaxis';
 
 /**
  * DS-2 — Edit existing program details.
@@ -15,7 +8,6 @@ import {
  * Source test plan: block2/DS-2/DS-2_test_plan.md
  * Locator rules: didaxis_prompt_template.md
  * Auth: reused admin session (tests/auth.setup.ts → playwright.config storageState).
- *        Tests call gotoPrograms() only — no per-test UI login.
  *
  * Notes about the live app behavior (verified via Playwright MCP exploration):
  *   - The Edit modal contains only Program Name + Description (plus an optional
@@ -35,68 +27,66 @@ import {
 test.describe('DS-2: Edit existing program — positive flows', () => {
   test.describe.configure({ timeout: 90_000 });
 
+  let programs: ProgramsPage;
   let programName: string;
   const originalDescription = 'Original description';
 
   test.beforeEach(async ({ page }) => {
+    programs = new ProgramsPage(page);
     programName = uniqueName();
-    await gotoPrograms(page);
-    await createProgram(page, programName, originalDescription);
+    await programs.goto();
+    await programs.createProgram(programName, originalDescription);
   });
 
-  test('TC-001: Edit form opens pre-populated with current program data', async ({ page }) => {
-    const dialog = await openEditModal(page, programName);
+  test('TC-001: Edit form opens pre-populated with current program data', async () => {
+    const dialog = await programs.openEditDialog(programName);
 
-    await expect(dialog.getByRole('heading', { name: 'Edit Program', level: 2 })).toBeVisible();
-
-    const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
-    const descriptionField = dialog.getByRole('textbox', { name: 'Description' });
-
-    await expect(nameField).toHaveValue(programName);
-    await expect(descriptionField).toHaveValue(originalDescription);
-    await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeVisible();
+    await expect(dialog.heading).toBeVisible();
+    await expect(dialog.programNameInput).toHaveValue(programName);
+    await expect(dialog.descriptionInput).toHaveValue(originalDescription);
+    await expect(dialog.primaryButton).toBeVisible();
+    await expect(dialog.cancelButton).toBeVisible();
   });
 
-  test('TC-002: Saving a changed Name updates the program list immediately', async ({ page }) => {
+  test('TC-002: Saving a changed Name updates the program list immediately', async () => {
     const updatedName = `${programName} - Updated`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(updatedName);
-    await saveAndClose(page, dialog, updatedName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(updatedName);
+    await dialog.saveAndClose(programs, updatedName);
 
-    await expect(rowByName(page, updatedName)).toBeVisible();
-    await expect(rowByName(page, programName)).toHaveCount(0);
+    await expect(programs.rowByName(updatedName)).toBeVisible();
+    await expect(programs.rowByName(programName)).toHaveCount(0);
   });
 
-  test('TC-003: Editing only the Description preserves all other fields', async ({ page }) => {
+  test('TC-003: Editing only the Description preserves all other fields', async () => {
     const newDescription = 'Updated curriculum focused on modern frameworks.';
 
-    let dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Description' }).fill(newDescription);
-    await saveAndClose(page, dialog, programName);
+    let dialog = await programs.openEditDialog(programName);
+    await dialog.fillDescription(newDescription);
+    await dialog.saveAndClose(programs, programName);
 
-    const row = rowByName(page, programName);
+    const row = programs.rowByName(programName);
     await expect(row).toBeVisible();
     await expect(row).toContainText(newDescription);
 
-    dialog = await openEditModal(page, programName);
-    await expect(dialog.getByRole('textbox', { name: 'Program Name' })).toHaveValue(programName);
-    await expect(dialog.getByRole('textbox', { name: 'Description' })).toHaveValue(newDescription);
+    dialog = await programs.openEditDialog(programName);
+    await expect(dialog.programNameInput).toHaveValue(programName);
+    await expect(dialog.descriptionInput).toHaveValue(newDescription);
   });
 
   test('TC-004: Edits persist after page refresh', async ({ page }) => {
     const updatedName = `${programName} - Updated`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(updatedName);
-    await saveAndClose(page, dialog, updatedName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(updatedName);
+    await dialog.saveAndClose(programs, updatedName);
 
     await page.reload();
-    await expect(page.getByRole('heading', { name: 'Programs', level: 2 })).toBeVisible();
+    await expect(programs.heading).toBeVisible();
 
-    await expect(rowByName(page, updatedName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(rowByName(page, programName)).toHaveCount(0);
+    await programs.expectRowVisible(updatedName);
+    await expect(programs.rowByName(programName)).toHaveCount(0);
   });
 
   test.skip(
@@ -104,31 +94,27 @@ test.describe('DS-2: Edit existing program — positive flows', () => {
     () => {},
   );
 
-  test('TC-006: Cancel discards changes', async ({ page }) => {
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill('Discarded Name');
+  test('TC-006: Cancel discards changes', async () => {
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName('Discarded Name');
+    await dialog.cancel();
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(dialog).toBeHidden();
-
-    await expect(rowByName(page, programName)).toBeVisible();
-    await expect(rowByName(page, 'Discarded Name')).toHaveCount(0);
+    await expect(programs.rowByName(programName)).toBeVisible();
+    await expect(programs.rowByName('Discarded Name')).toHaveCount(0);
   });
 
-  test('TC-007: Save button enables only after a valid change', async ({ page }) => {
-    const dialog = await openEditModal(page, programName);
-    const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
-    const saveBtn = dialog.getByRole('button', { name: 'Save' });
+  test('TC-007: Save button enables only after a valid change', async () => {
+    const dialog = await programs.openEditDialog(programName);
 
     // Step 1 — no edits: test plan expects Save disabled; app keeps it enabled (gap).
-    await expect(saveBtn).toBeEnabled();
+    await expect(dialog.primaryButton).toBeEnabled();
 
     // Step 2 — real change: Save should be enabled.
-    await nameField.fill(`${programName}x`);
-    await expect(saveBtn).toBeEnabled();
+    await dialog.fillProgramName(`${programName}x`);
+    await expect(dialog.primaryButton).toBeEnabled();
 
     // Step 3 — revert to original: test plan expects no-change state; app keeps Save enabled (gap).
-    await nameField.fill(programName);
-    await expect(saveBtn).toBeEnabled();
+    await dialog.fillProgramName(programName);
+    await expect(dialog.primaryButton).toBeEnabled();
   });
 });

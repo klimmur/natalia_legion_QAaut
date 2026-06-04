@@ -1,98 +1,74 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
-import {
-  SLOW_LIST_TIMEOUT,
-  createProgram,
-  gotoPrograms,
-  openEditModal,
-  rowByName,
-  uniqueName,
-} from './didaxis-helpers';
+import { SLOW_LIST_TIMEOUT, uniqueName } from './didaxis-helpers';
+import { ProgramsPage } from './pages/didaxis';
 
 /**
  * DS-2 — Edit existing program — negative flows.
  * Source test plan: block2/DS-2/DS-2_test_plan.md (TC-101…TC-111)
  * Auth: reused admin session (tests/auth.setup.ts → playwright.config storageState).
- *        Tests call gotoPrograms() only — no per-test UI login.
  */
 
 test.describe('DS-2: Edit existing program — negative flows', () => {
   test.describe.configure({ timeout: 90_000 });
 
+  let programs: ProgramsPage;
   let programName: string;
   const originalDescription = 'Original description';
 
   test.beforeEach(async ({ page }) => {
+    programs = new ProgramsPage(page);
     programName = uniqueName();
-    await gotoPrograms(page);
-    await createProgram(page, programName, originalDescription);
+    await programs.goto();
+    await programs.createProgram(programName, originalDescription);
   });
 
-  test('TC-101: Empty Name is rejected (Save disabled)', async ({ page }) => {
-    const dialog = await openEditModal(page, programName);
-    const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
-    const saveBtn = dialog.getByRole('button', { name: 'Save' });
+  test('TC-101: Empty Name is rejected (Save disabled)', async () => {
+    const dialog = await programs.openEditDialog(programName);
 
-    await nameField.fill('');
+    await dialog.fillProgramName('');
 
-    await expect(saveBtn).toBeDisabled();
-    await expect(dialog).toBeVisible();
+    await expect(dialog.primaryButton).toBeDisabled();
+    await expect(dialog.dialog).toBeVisible();
 
-    // Closing without saving leaves the original name in place.
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(dialog).toBeHidden();
-    await expect(rowByName(page, programName)).toBeVisible();
+    await dialog.cancel();
+    await expect(programs.rowByName(programName)).toBeVisible();
   });
 
-  test('TC-102: Whitespace-only Name is rejected (Save disabled)', async ({ page }) => {
-    const dialog = await openEditModal(page, programName);
-    const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
-    const saveBtn = dialog.getByRole('button', { name: 'Save' });
+  test('TC-102: Whitespace-only Name is rejected (Save disabled)', async () => {
+    const dialog = await programs.openEditDialog(programName);
 
-    await nameField.fill('   ');
+    await dialog.fillProgramName('   ');
 
-    // App treats whitespace-only as empty for the disable check.
-    await expect(saveBtn).toBeDisabled();
-    await expect(dialog).toBeVisible();
+    await expect(dialog.primaryButton).toBeDisabled();
+    await expect(dialog.dialog).toBeVisible();
 
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
-    await expect(rowByName(page, programName)).toBeVisible();
+    await dialog.cancel();
+    await expect(programs.rowByName(programName)).toBeVisible();
   });
 
-  test('TC-103: Duplicate program name — current app accepts duplicates (documented gap)', async ({
-    page,
-  }) => {
-    // Seed a SECOND program with a distinct name, then try to rename our
-    // primary program to that name. The test plan expects rejection; the
-    // current app silently accepts duplicates. We document this and assert
-    // the actual behavior so the suite stays green and the gap is visible.
+  test('TC-103: Duplicate program name — current app accepts duplicates (documented gap)', async () => {
     const otherName = uniqueName('Data Science 2026');
-    await createProgram(page, otherName, 'Other program');
+    await programs.createProgram(otherName, 'Other program');
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(otherName);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(otherName);
+    await dialog.clickPrimary();
 
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
-    // Two rows now share the same name — duplicate was accepted.
-    await expect(
-      rowByName(page, otherName),
-    ).toHaveCount(2, { timeout: SLOW_LIST_TIMEOUT });
+    await expect(dialog.dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await expect(programs.rowByName(otherName)).toHaveCount(2, {
+      timeout: SLOW_LIST_TIMEOUT,
+    });
   });
 
-  test('TC-104: Name exceeding maximum length (101 chars) — documented gap if accepted', async ({
-    page,
-  }) => {
-    // Confluence Field Definitions: Name max 100 characters. Test plan: N+1 should be rejected.
+  test('TC-104: Name exceeding maximum length (101 chars) — documented gap if accepted', async () => {
     const overMaxName = 'x'.repeat(101);
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(overMaxName);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(overMaxName);
+    await dialog.clickPrimary();
 
-    // Test plan expects validation error or blocked save. Current app may accept the value —
-    // assert actual behavior so future max-length enforcement breaks this test loudly.
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(rowByName(page, overMaxName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
+    await expect(dialog.dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await programs.expectRowVisible(overMaxName);
   });
 
   test.skip(
@@ -105,7 +81,6 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
   }) => {
     const updatedName = `${programName} - 500Test`;
 
-    // Mock every PATCH /api/programs/* to return 500 — simulates server failure.
     await page.route('**/api/programs/*', async (route) => {
       if (route.request().method() === 'PATCH') {
         await route.fulfill({ status: 500, body: 'Internal Server Error' });
@@ -114,25 +89,18 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
       await route.fallback();
     });
 
-    const dialog = await openEditModal(page, programName);
-    const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
-    await nameField.fill(updatedName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(updatedName);
+    await dialog.clickPrimary();
 
-    await dialog.getByRole('button', { name: 'Save' }).click();
-
-    // Give the failed request a moment to settle, then assert state.
     await page.waitForTimeout(2000);
 
-    // Modal should remain open; the user's typed value should still be in the field.
-    await expect(dialog).toBeVisible();
-    await expect(nameField).toHaveValue(updatedName);
+    await expect(dialog.dialog).toBeVisible();
+    await expect(dialog.programNameInput).toHaveValue(updatedName);
+    await expect(programs.rowByName(updatedName)).toHaveCount(0);
 
-    // The list must NOT show the updated name (save did not persist).
-    await expect(rowByName(page, updatedName)).toHaveCount(0);
-
-    // Cleanup: remove the route so the dialog can be cancelled normally.
     await page.unroute('**/api/programs/*');
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await dialog.cancel();
   });
 
   test('TC-107: Network offline on save — modal does not close and no stale row appears', async ({
@@ -141,23 +109,22 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
   }) => {
     const updatedDescription = `Offline test ${Date.now()}`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Description' }).fill(updatedDescription);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillDescription(updatedDescription);
 
     await context.setOffline(true);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+    await dialog.clickPrimary();
 
     await page.waitForTimeout(2000);
 
-    // Modal stays open and the list must not show a stale optimistic update.
-    await expect(dialog).toBeVisible();
-    const row = rowByName(page, programName);
+    await expect(dialog.dialog).toBeVisible();
+    const row = programs.rowByName(programName);
     await expect(row).toBeVisible();
     await expect(row).toContainText(originalDescription);
     await expect(row).not.toContainText(updatedDescription);
 
     await context.setOffline(false);
-    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await dialog.cancel();
   });
 
   test.skip(
@@ -178,15 +145,13 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
   test('TC-111: Esc with unsaved changes closes silently (no warning — documented gap)', async ({
     page,
   }) => {
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill('Discarded via Esc');
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName('Discarded via Esc');
 
     await page.keyboard.press('Escape');
 
-    // Test plan expects a confirmation dialog. Current app closes immediately
-    // without any warning. We assert the actual behavior to document the gap.
-    await expect(dialog).toBeHidden();
-    await expect(rowByName(page, programName)).toBeVisible();
-    await expect(rowByName(page, 'Discarded via Esc')).toHaveCount(0);
+    await expect(dialog.dialog).toBeHidden();
+    await expect(programs.rowByName(programName)).toBeVisible();
+    await expect(programs.rowByName('Discarded via Esc')).toHaveCount(0);
   });
 });

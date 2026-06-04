@@ -1,77 +1,67 @@
 import { test, expect } from '../fixtures/cleanup.fixture';
-import {
-  SLOW_LIST_TIMEOUT,
-  createProgram,
-  gotoPrograms,
-  openEditModal,
-  rowByName,
-  saveAndClose,
-  uniqueName,
-} from './didaxis-helpers';
+import { SLOW_LIST_TIMEOUT, uniqueName } from './didaxis-helpers';
+import { ProgramDialogPage, ProgramsPage } from './pages/didaxis';
 
 /**
  * DS-2 — Edit existing program — edge cases.
  * Source test plan: block2/DS-2/DS-2_test_plan.md (TC-201…TC-214)
  * Auth: reused admin session (tests/auth.setup.ts → playwright.config storageState).
- *        Tests call gotoPrograms() only — no per-test UI login.
  */
 
 test.describe('DS-2: Edit existing program — edge cases', () => {
   test.describe.configure({ timeout: 120_000 });
 
+  let programs: ProgramsPage;
   let programName: string;
   const originalDescription = 'Original description';
 
   test.beforeEach(async ({ page }) => {
+    programs = new ProgramsPage(page);
     programName = uniqueName();
-    await gotoPrograms(page);
-    await createProgram(page, programName, originalDescription);
+    await programs.goto();
+    await programs.createProgram(programName, originalDescription);
   });
 
-  test('TC-201: Leading/trailing whitespace in Name is trimmed on save', async ({ page }) => {
+  test('TC-201: Leading/trailing whitespace in Name is trimmed on save', async () => {
     const trimmedName = `${programName} - Trimmed`;
     const paddedName = `  ${trimmedName}  `;
 
-    let dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(paddedName);
-    await saveAndClose(page, dialog, trimmedName);
+    let dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(paddedName);
+    await dialog.saveAndClose(programs, trimmedName);
 
-    // Reopen and confirm the stored value is trimmed.
-    dialog = await openEditModal(page, trimmedName);
-    await expect(dialog.getByRole('textbox', { name: 'Program Name' })).toHaveValue(trimmedName);
+    dialog = await programs.openEditDialog(trimmedName);
+    await expect(dialog.programNameInput).toHaveValue(trimmedName);
   });
 
-  test('TC-202: Name at exactly the max length (100 chars) saves successfully', async ({
-    page,
-  }) => {
-    // Confluence Field Definitions: Name max 100 characters.
+  test('TC-202: Name at exactly the max length (100 chars) saves successfully', async () => {
     const exactMaxName = 'A'.repeat(100);
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(exactMaxName);
-    await saveAndClose(page, dialog, exactMaxName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(exactMaxName);
+    await dialog.saveAndClose(programs, exactMaxName);
 
-    await expect(rowByName(page, exactMaxName)).toBeVisible();
+    await expect(programs.rowByName(exactMaxName)).toBeVisible();
   });
 
-  test('TC-203: Name with special characters and punctuation is accepted', async ({ page }) => {
+  test('TC-203: Name with special characters and punctuation is accepted', async () => {
     const specialName = `${programName} — C++/C#, JS & TS (Advanced) #1`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(specialName);
-    await saveAndClose(page, dialog, specialName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(specialName);
+    await dialog.saveAndClose(programs, specialName);
 
-    await expect(rowByName(page, specialName)).toBeVisible();
+    await expect(programs.rowByName(specialName)).toBeVisible();
   });
 
-  test('TC-204: Name with Unicode and emoji is accepted', async ({ page }) => {
+  test('TC-204: Name with Unicode and emoji is accepted', async () => {
     const unicodeName = `${programName} Веб-разработка 🚀 — 程式設計`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(unicodeName);
-    await saveAndClose(page, dialog, unicodeName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(unicodeName);
+    await dialog.saveAndClose(programs, unicodeName);
 
-    await expect(rowByName(page, unicodeName)).toBeVisible();
+    await expect(programs.rowByName(unicodeName)).toBeVisible();
   });
 
   test('TC-205: XSS payload in Name/Description is rendered as text, not executed', async ({
@@ -86,85 +76,68 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
       await d.dismiss();
     });
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(xssName);
-    await dialog.getByRole('textbox', { name: 'Description' }).fill(xssDescription);
-    await saveAndClose(page, dialog, xssName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(xssName);
+    await dialog.fillDescription(xssDescription);
+    await dialog.saveAndClose(programs, xssName);
 
-    // No JS alert should have fired at any point during/after save.
     await page.waitForTimeout(500);
     expect(alertFired).toBe(false);
 
-    // Reopen — the script tag survives as plain text in the input value.
-    const reopened = await openEditModal(page, xssName);
-    await expect(reopened.getByRole('textbox', { name: 'Program Name' })).toHaveValue(xssName);
-    await expect(reopened.getByRole('textbox', { name: 'Description' })).toHaveValue(
-      xssDescription,
-    );
+    const reopened = await programs.openEditDialog(xssName);
+    await expect(reopened.programNameInput).toHaveValue(xssName);
+    await expect(reopened.descriptionInput).toHaveValue(xssDescription);
   });
 
-  test('TC-206: SQL-injection-like input is stored verbatim as a string', async ({ page }) => {
+  test('TC-206: SQL-injection-like input is stored verbatim as a string', async () => {
     const sqlName = `${programName} Robert'); DROP TABLE Programs;--`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(sqlName);
-    await saveAndClose(page, dialog, sqlName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(sqlName);
+    await dialog.saveAndClose(programs, sqlName);
 
-    // The Programs table is still rendered (would be empty if SQL had executed).
-    await expect(page.getByRole('table')).toBeVisible();
-    await expect(rowByName(page, sqlName)).toBeVisible();
+    await expect(programs.table).toBeVisible();
+    await expect(programs.rowByName(sqlName)).toBeVisible();
   });
 
-  test('TC-207: Description at documented maximum length (500 chars) round-trips', async ({
-    page,
-  }) => {
-    // Confluence Field Definitions: Description max 500 characters.
+  test('TC-207: Description at documented maximum length (500 chars) round-trips', async () => {
     const maxDescription = 'D'.repeat(500);
 
-    let dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Description' }).fill(maxDescription);
-    await saveAndClose(page, dialog, programName);
+    let dialog = await programs.openEditDialog(programName);
+    await dialog.fillDescription(maxDescription);
+    await dialog.saveAndClose(programs, programName);
 
-    dialog = await openEditModal(page, programName);
-    await expect(dialog.getByRole('textbox', { name: 'Description' })).toHaveValue(maxDescription);
+    dialog = await programs.openEditDialog(programName);
+    await expect(dialog.descriptionInput).toHaveValue(maxDescription);
   });
 
-  test('TC-208: Saving with no changes closes the modal and keeps the row unchanged', async ({
-    page,
-  }) => {
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('button', { name: 'Save' }).click();
+  test('TC-208: Saving with no changes closes the modal and keeps the row unchanged', async () => {
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.clickPrimary();
 
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await expect(dialog.dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
 
-    const row = rowByName(page, programName);
+    const row = programs.rowByName(programName);
     await expect(row).toBeVisible();
     await expect(row).toContainText(originalDescription);
   });
 
-  test('TC-209: Renaming back to the original name after another change succeeds', async ({
-    page,
-  }) => {
+  test('TC-209: Renaming back to the original name after another change succeeds', async () => {
     const tempName = `${programName} - Temp`;
 
-    let dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(tempName);
-    await saveAndClose(page, dialog, tempName);
+    let dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(tempName);
+    await dialog.saveAndClose(programs, tempName);
 
-    dialog = await openEditModal(page, tempName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(programName);
-    await saveAndClose(page, dialog, programName);
+    dialog = await programs.openEditDialog(tempName);
+    await dialog.fillProgramName(programName);
+    await dialog.saveAndClose(programs, programName);
 
-    await expect(rowByName(page, programName)).toBeVisible();
-    await expect(rowByName(page, tempName)).toHaveCount(0);
+    await expect(programs.rowByName(programName)).toBeVisible();
+    await expect(programs.rowByName(tempName)).toHaveCount(0);
   });
 
   test('TC-210: Rapid double-click on Save issues only one PATCH request', async ({ page }) => {
-    // KNOWN GAP: the app does NOT disable the Save button during the in-flight
-    // request and does NOT debounce — a double-click currently produces two
-    // PATCH calls. We mark this test as expected-to-fail so the suite stays
-    // green while the gap is visible. Once the app is fixed, this annotation
-    // should be removed (Playwright will surface a "passed unexpectedly" then).
     test.fail();
 
     const updatedName = `${programName} - DoubleClick`;
@@ -176,14 +149,12 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
       }
     });
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(updatedName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(updatedName);
+    await dialog.primaryButton.click({ clickCount: 2, delay: 30 });
 
-    const saveBtn = dialog.getByRole('button', { name: 'Save' });
-    await saveBtn.click({ clickCount: 2, delay: 30 });
-
-    await expect(rowByName(page, updatedName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await programs.expectRowVisible(updatedName);
+    await expect(dialog.dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
 
     expect(patchCount).toBe(1);
   });
@@ -201,46 +172,40 @@ test.describe('DS-2: Edit existing program — edge cases', () => {
   test('TC-213: Browser Back after Save does not reopen a stale Edit modal', async ({ page }) => {
     const updatedName = `${programName} - BackTest`;
 
-    const dialog = await openEditModal(page, programName);
-    await dialog.getByRole('textbox', { name: 'Program Name' }).fill(updatedName);
-    await saveAndClose(page, dialog, updatedName);
+    const dialog = await programs.openEditDialog(programName);
+    await dialog.fillProgramName(updatedName);
+    await dialog.saveAndClose(programs, updatedName);
 
     await page.goBack();
 
-    // No edit dialog should be visible, regardless of which route Back lands on.
-    await expect(page.getByRole('dialog', { name: 'Edit Program' })).toHaveCount(0);
+    await expect(new ProgramDialogPage(page, 'edit').dialog).toHaveCount(0);
   });
 
   test('TC-214: Edit modal is keyboard-accessible', async ({ page }) => {
-    const row = rowByName(page, programName);
-    const editBtn = row.getByRole('button', { name: '✏️' });
+    const editBtn = programs.editButton(programName);
 
     await editBtn.focus();
     await page.keyboard.press('Enter');
 
-    const dialog = page.getByRole('dialog', { name: 'Edit Program' });
-    await expect(dialog).toBeVisible();
+    const dialog = new ProgramDialogPage(page, 'edit');
+    await expect(dialog.dialog).toBeVisible();
 
-    const nameField = dialog.getByRole('textbox', { name: 'Program Name' });
-    const descriptionField = dialog.getByRole('textbox', { name: 'Description' });
-    const saveBtn = dialog.getByRole('button', { name: 'Save' });
-
-    await nameField.focus();
-    await expect(nameField).toBeFocused();
+    await dialog.programNameInput.focus();
+    await expect(dialog.programNameInput).toBeFocused();
 
     await page.keyboard.press('Tab');
-    await expect(descriptionField).toBeFocused();
+    await expect(dialog.descriptionInput).toBeFocused();
 
     const keyboardEditedName = `${programName} - KB`;
-    await nameField.fill(keyboardEditedName);
-    await saveBtn.focus();
+    await dialog.fillProgramName(keyboardEditedName);
+    await dialog.primaryButton.focus();
     await page.keyboard.press('Enter');
 
-    await expect(rowByName(page, keyboardEditedName)).toBeVisible({ timeout: SLOW_LIST_TIMEOUT });
-    await expect(dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
+    await programs.expectRowVisible(keyboardEditedName);
+    await expect(dialog.dialog).toBeHidden({ timeout: SLOW_LIST_TIMEOUT });
 
-    const escDialog = await openEditModal(page, keyboardEditedName);
+    const escDialog = await programs.openEditDialog(keyboardEditedName);
     await page.keyboard.press('Escape');
-    await expect(escDialog).toBeHidden();
+    await expect(escDialog.dialog).toBeHidden();
   });
 });
