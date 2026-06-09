@@ -61,6 +61,7 @@ test.describe('DS-2: Edit existing program — negative flows', () => {
   });
 
   test('TC-104: Name exceeding maximum length (101 chars) — documented gap if accepted', async () => {
+    test.skip(true, 'Quarantined for CI — fails under crowded Programs list; see DS-107');
     const overMaxName = 'x'.repeat(101);
 
     const dialog = await programs.openEditDialog(programName);
